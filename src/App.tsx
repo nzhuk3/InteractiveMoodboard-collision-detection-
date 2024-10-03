@@ -12,7 +12,7 @@ function App() {
           speed: 0.5,
           children:<>
             <div className="panel">
-              <span>Block</span><span> 1</span>
+              <span>Никита Врацкий</span><span></span>
             </div>
           </>
         },
@@ -21,7 +21,7 @@ function App() {
           speed: 0.2,
           children:<>
             <div className="panel">
-              <span>Block</span><span> 2</span>
+              <span>Влад Мишота</span><span></span>
             </div>
           </>
         },

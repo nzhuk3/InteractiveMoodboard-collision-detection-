@@ -114,4 +114,8 @@ input {
     pointer-events: none;
 }
 
+.movable:nth-child(2) {
+    margin-top: 10px;
+}
+
 

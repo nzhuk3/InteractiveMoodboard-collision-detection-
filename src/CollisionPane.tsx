@@ -27,12 +27,13 @@ interface MovableInitial {
   
   function CollisionPane({ movables }: MovableProps) {
     const paneRef = useRef<HTMLDivElement>(null);
-    const movablesRef = useRef<Partial<MovableExtended>[]>(movables); // Используем Partial для расширяемых свойств
+    const movablesRef = useRef<Partial<MovableExtended>[]>(movables);
     const movedElId = useRef<number>(-1);
     const requestRef = useRef<number | null>(null);
     const [isDragged, setIsDragging] = useState<boolean>(false);
     const [resetTrigger, resetPane] = useState(false);
-    // const listeners = useRef<Movable[]>([]);
+    const listeners = useRef<Partial<MovableExtended>[]>([]);
+    const COLLISION_THRESHOLD = 5;
 
     useEffect(() => {
         movablesRef.current.forEach((movable, id) => {
@@ -88,8 +89,8 @@ interface MovableInitial {
             setIsDragging(true);
             movablesRef.current.forEach((movable, id) => {
                 if (Object.is(nativeEvent.target, movable.element) && movable.element) {
-                    // listeners.current = [];
-                    // listeners.current.push(movable);
+                    listeners.current = [];
+                    listeners.current.push(movable);
                     movedElId.current = id;
                     movable.rect = movable.element.getBoundingClientRect();
                     movable.offset = {x: nativeEvent.clientX - movable.rect.left, y: nativeEvent.clientY - movable.rect.top};
@@ -107,33 +108,84 @@ interface MovableInitial {
         resetPane(!resetTrigger);
     }, [resetTrigger])
 
-    // function checkForCollision(movingRect: DOMRect, steadyRect: DOMRect): boolean {
-    //     return movingRect.right - steadyRect.left >= -COLLISION_THRESHOLD 
-    //         && movingRect.right - steadyRect.left <= (COLLISION_THRESHOLD + movingRect.width * 2) 
-    //         && movingRect.bottom - steadyRect.top >= -COLLISION_THRESHOLD 
-    //         && movingRect.bottom - steadyRect.top <= (COLLISION_THRESHOLD + movingRect.height * 2);
-    // }
+    function checkForCollision(movingRect: DOMRect, steadyRect: DOMRect): boolean {
+        return movingRect.right - steadyRect.left > -COLLISION_THRESHOLD 
+            && movingRect.right - steadyRect.left < (COLLISION_THRESHOLD + movingRect.width * 2) 
+            && movingRect.bottom - steadyRect.top > -COLLISION_THRESHOLD 
+            && movingRect.bottom - steadyRect.top < (COLLISION_THRESHOLD + movingRect.height * 2);
+    }
 
-    /* function detectCollision(id) {
+    function detectCollision(id: number) {
         for (let i = 0; i < movablesRef.current.length; i++) {
-            const rect1 = movablesRef.current[movedElId.current].rect;
-            const rect2 = movablesRef.current[i].rect;
-            if (checkForCollision(rect1, rect2) && i != movedElId.current) {
-                listeners.current = [];
-                listeners.current.push(movablesRef.current[movedElId.current]);
-                listeners.current.push(movablesRef.current[i]);
-                const offset = getCollisionOffset(rect1, rect2);
-                movablesRef.current[i].mouse.x += offset.x;
-                movablesRef.current[i].mouse.y += offset.y;
+            if (i != id) {
+                const rect1 = movablesRef.current[movedElId.current].element?.getBoundingClientRect();
+                const rect2 = movablesRef.current[i].element?.getBoundingClientRect();
+                if (checkForCollision(rect1 as DOMRect, rect2 as DOMRect)) {
+                    listeners.current = [];
+                    listeners.current.push(movablesRef.current[movedElId.current]);
+                    listeners.current.push(movablesRef.current[i]);
+                    const offset = getCollisionOffset(rect1 as DOMRect, rect2 as DOMRect);
+                    console.log(offset);
+                    movablesRef.current[i].mouse.x += offset.x;
+                    movablesRef.current[i].mouse.y += offset.y;
+                    
+                } else {
+                    if (listeners.current.includes(movablesRef.current[i])) {
+                        listeners.current.filter((item) => !Object.is(item, movablesRef.current[i]));
+                    }
+                }
             }
         }
+    }
+
+    // function getCollisionOffset(movingRect: DOMRect, steadyRect: DOMRect) {
+    //     const vector = {
+    //         x: (steadyRect.left + steadyRect.width / 2) - (movingRect.left + movingRect.width / 2),
+    //         y: (steadyRect.top + steadyRect.height / 2) - (movingRect.top + movingRect.height / 2)
+    //     };
     
-    } */
+    //     const overlapX = (movingRect.width / 2 + steadyRect.width / 2) - Math.abs(vector.x) + COLLISION_THRESHOLD;
+    //     const overlapY = (movingRect.height / 2 + steadyRect.height / 2) - Math.abs(vector.y) + COLLISION_THRESHOLD;
+    //     // Смещение должно быть в сторону меньшего пересечения
+    //     if (overlapX < overlapY) {
+    //         return { x: Math.sign(vector.x) * overlapX, y: 0 };
+    //     } else {
+    //         return { x: 0, y: Math.sign(vector.y) * overlapY };
+    //     }
+    // }
+
+    function getCollisionOffset(movingRect: DOMRect, steadyRect: DOMRect) {        
+        const movingCenter = {
+            x: movingRect.left + movingRect.width / 2,
+            y: movingRect.top + movingRect.height / 2
+        };
+        const steadyCenter = {
+            x: steadyRect.left + steadyRect.width / 2,
+            y: steadyRect.top + steadyRect.height / 2
+        };
+        const vector = {
+            x: steadyCenter.x - movingCenter.x,
+            y: steadyCenter.y - movingCenter.y 
+        };
+
+        const overlapX = (movingRect.width / 2 + steadyRect.width / 2) + COLLISION_THRESHOLD - Math.abs(vector.x);
+        const overlapY = (movingRect.height / 2 + steadyRect.height / 2) + COLLISION_THRESHOLD - Math.abs(vector.y);
+
+        const b1 = Math.abs(vector.x);
+        const b2 = (movingRect.width / 2) + (steadyRect.width / 2) + COLLISION_THRESHOLD;
+        const c1 = Math.abs(vector.y);
+        const c2 = (movingRect.height / 2) + (steadyRect.height / 2) + COLLISION_THRESHOLD;
+        
+        if (overlapX < overlapY) {
+            return { x: Math.sign(vector.x) * (overlapX), y: (Math.abs(vector.y) / b2 * b1) * Math.sign(vector.y) * 0.01 };
+        } else {
+            return { x: (Math.abs(vector.x) / c2 * c1) * Math.sign(vector.x) * 0.01, y: Math.sign(vector.y) * (overlapY) };
+        }
+    }
 
     const animate = useCallback(() => {
-        const movable = movablesRef.current[movedElId.current];
-        // detectCollision(movedElId.current);
-        /* listeners.forEach(listener => {
+        detectCollision(movedElId.current);
+        listeners.current.forEach(listener => {
             if (listener.pos && listener.mouse && listener.speed) {
             listener.pos.x += (listener.mouse.x - listener.pos.x) * listener.speed;
             listener.pos.y += (listener.mouse.y - listener.pos.y) * listener.speed;
@@ -142,15 +194,7 @@ interface MovableInitial {
                 listener.element.style.transform = `translate(${listener.pos.x}px, ${listener.pos.y}px)`;
             }
            }
-        }) */
-        if (movable.pos && movable.mouse && movable.speed) {
-            movable.pos.x += (movable.mouse.x - movable.pos.x) * movable.speed;
-            movable.pos.y += (movable.mouse.y - movable.pos.y) * movable.speed;
-
-            if (movable.element) {
-                movable.element.style.transform = `translate(${movable.pos.x}px, ${movable.pos.y}px)`;
-            }
-        }
+        })
         
         requestRef.current = requestAnimationFrame(animate);
     }, []);
